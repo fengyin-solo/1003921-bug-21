@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import Dashboard from '@/views/Dashboard.vue'
 const Hazard = () => import('@/views/hazard/index.vue')
+const HazardDetail = () => import('@/views/hazard/detail.vue')
 const Deformation = () => import('@/views/deformation/index.vue')
 const Crack = () => import('@/views/crack/index.vue')
 const Tilt = () => import('@/views/tilt/index.vue')
@@ -25,6 +26,7 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'dashboard', component: Dashboard },
     { path: '/hazard', name: 'hazard', component: Hazard },
+    { path: '/hazard/:id', name: 'hazard-detail', component: HazardDetail },
     { path: '/deformation', name: 'deformation', component: Deformation },
     { path: '/crack', name: 'crack', component: Crack },
     { path: '/tilt', name: 'tilt', component: Tilt },

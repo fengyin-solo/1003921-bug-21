@@ -43,11 +43,18 @@
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
-          <td>{{ row.status }}</td>
+          <td v-for="column in columns" :key="column">
+            <RouterLink v-if="column === '隐患点编号'" class="link" :to="`/hazard/${row.id}`">
+              {{ row[column] ?? '—' }}
+            </RouterLink>
+            <template v-else>{{ row[column] ?? '—' }}</template>
+          </td>
+          <td>
+            <span class="status-tag" :class="{ terminal: !row.pending }">{{ row.status }}</span>
+          </td>
           <td class="row-actions">
             <button
-              v-for="action in actions"
+              v-for="action in availableActions(row)"
               :key="action"
               class="link"
               type="button"
@@ -55,6 +62,7 @@
             >
               {{ action }}
             </button>
+            <span v-if="!availableActions(row).length" class="muted-text">已到终态，无待办动作</span>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -65,7 +73,8 @@
 
     <footer class="page-foot">
       <span>共 {{ total }} 条隐患点台账记录</span>
-      <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
+      <span v-if="successMessage" class="success-text">{{ successMessage }}</span>
+      <span v-else-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
   </section>
 </template>
@@ -79,25 +88,41 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { checkTransition, terminalStatus } from '@/data/state-machine'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('hazard')
 const columns = ["隐患点编号", "隐患点名称", "灾害类型", "所在乡镇", "经纬度坐标", "威胁户数", "威胁人口", "隐患状态"]
 const actions = ["纳入监测", "启动治理", "申请核销"]
-const statuses = ["在册", "监测中", "已治理", "已核销", "新增"]
-const stats = [{"label": "隐患点总数", "value": 0}, {"label": "监测中数量", "value": 0}, {"label": "已治理数量", "value": 0}]
+const statuses = ["在册", "监测中", "已治理", "已核销"]
+const stats = computed(() => [
+  { label: "隐患点总数", value: rows.value.length },
+  { label: "监测中数量", value: rows.value.filter((row) => String(row.status) === "监测中").length },
+  { label: "已治理数量", value: rows.value.filter((row) => String(row.status) === "已治理").length },
+])
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const successMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const terminal = terminalStatus(meta)
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
     count: rows.value.filter((row) => String(row.status) === status).length,
   })),
 )
+
+// 只给出当前状态下合法的下一步动作：已核销等终态不再出现任何动作按钮，
+// 从 UI 侧就避免「治理 / 核销」并发入口并存。
+function availableActions(row: EntryRow): string[] {
+  if (String(row.status) === terminal) {
+    return []
+  }
+  return actions.filter((action) => checkTransition(meta, row.status, action).ok)
+}
 
 function resetFilters() {
   filters.value = {}
@@ -112,13 +137,15 @@ function openCreate() {
   errorMessage.value = '隐患点登记入口尚未接入审批流'
 }
 
-function runAction(action: string, row: EntryRow) {
+async function runAction(action: string, row: EntryRow) {
   errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
+  successMessage.value = ''
+  const result = await applyAction(meta.key, Number(row.id), action)
   if (!result.ok) {
     errorMessage.value = result.message
     return
   }
+  successMessage.value = result.message
   reload()
 }
 

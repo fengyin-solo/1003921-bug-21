@@ -68,4 +68,11 @@ npm run build
 - 字段、状态、动作与流转目标集中在 `frontend/src/data/modules.ts`；示例数据在
   `frontend/src/data/seed.ts`。
 - 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。
+- 隐患点状态机集中在 `frontend/src/data/state-machine.ts`：`在册 → 监测中 → 已治理 → 已核销`
+  严格单向逐环推进，禁止跳步、回退；已核销是终态。缺状态来源的旧记录（如历史值「新增」）
+  读取时归一化按「在册」兼容，历史已核销记录保持原结论。
+- 待办（`pending`）不再作为可写标志，统一由「状态是否为终态」派生；核销/治理会在同一事务里
+  联动闭环关联巡查待办（`side-effects.ts`），联动失败整体回滚。并发动作通过串行队列 + 期望前置
+  状态保证只有一个成功。
+- 状态链路有冒烟测试：`cd frontend && npm run smoke`。
 - 想回到初始数据：清掉浏览器里 `geohazard-monitor-prevention:entries` 这一项，或调用 `resetModule(模块)`。
