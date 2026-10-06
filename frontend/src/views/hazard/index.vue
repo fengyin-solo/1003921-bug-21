@@ -47,7 +47,7 @@
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
-              v-for="action in actions"
+              v-for="action in allowedActions(row)"
               :key="action"
               class="link"
               type="button"
@@ -55,6 +55,7 @@
             >
               {{ action }}
             </button>
+            <span v-if="!allowedActions(row).length" class="muted-text">—</span>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -74,6 +75,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import {
+  availableActions,
   downloadEntries,
   listEntries,
   moduleMeta,
@@ -83,8 +85,8 @@ import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('hazard')
 const columns = ["隐患点编号", "隐患点名称", "灾害类型", "所在乡镇", "经纬度坐标", "威胁户数", "威胁人口", "隐患状态"]
-const actions = ["纳入监测", "启动治理", "申请核销"]
-const statuses = ["在册", "监测中", "已治理", "已核销", "新增"]
+// 在册 → 监测中 → 已治理 → 已核销 单向推进，页面只给当前状态的下一步
+const statuses = ["在册", "监测中", "已治理", "已核销"]
 const stats = [{"label": "隐患点总数", "value": 0}, {"label": "监测中数量", "value": 0}, {"label": "已治理数量", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
@@ -92,6 +94,11 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+
+// 动作按钮随状态收敛：已核销等终态不再出现任何可执行动作
+function allowedActions(row: EntryRow): string[] {
+  return availableActions(meta, String(row.status))
+}
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
